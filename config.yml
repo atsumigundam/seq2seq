@@ -1,0 +1,16 @@
+encdec:
+  epoch: 50
+  lstm_layers: 2
+  dropout: 0.1
+  batch: 128
+  embed: 512
+  hidden: 1024
+  model: train.model
+  max_vocab_size: 30000
+train_file:
+  q: ./resources/input4.txt
+  a: ./resources/output4.txt
+train_token_file:
+  q: ./resources/inputtoken.txt
+  a: ./resources/outputtoken.txt
+neologd_dic_path: /data/home/katsumi/mecab/dic/mecab-ipadic-neologd
