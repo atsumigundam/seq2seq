@@ -1,6 +1,6 @@
 encdec:
   epoch: 50
-  lstm_layers: 3
+  lstm_layers: 2
   dropout: 0.1
   batch: 128
   embed: 512
