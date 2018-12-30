@@ -39,14 +39,14 @@ class Tokenizer:
         return token_list
 
     def tokenize(self, sentence):
-        self.t.parse("")  # これをしないと正しい結果が返ってこないバグが存在
+        self.t.parse("")  
         node = self.t.parseToNode(sentence)
         return self.__parse(node)
 
 
 if __name__ == '__main__':
-    neologd_dic_path = "/data/home/katsumi/mecab/dic/mecab-ipadic-neologd" # お好きな辞書のパス
-    test = "夜の水面に飛び交う蛍が流れ星みたいで綺麗なのん。のんのんびより。"
+    neologd_dic_path = "/data/home/katsumi/mecab/dic/mecab-ipadic-neologd"
+    test = ""
     tokenizer = Tokenizer("-Ochasen -d " + neologd_dic_path)
     token_list = tokenizer.tokenize(test)
     for token in token_list:
