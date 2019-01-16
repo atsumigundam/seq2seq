@@ -246,9 +246,9 @@ EOS_TAG = ("<EOS>", 1)
 SOS_TAG = ("<SOS>",2)
 PAD_TAG = ("<PAD>",3)
 def main():
-    #tokenize()
+    tokenize()
     traindata,word_to_id,id_to_word =  get_train_data(TRAIN_TOKEN_FILE,max_vocab_size)
-    #train(traindata,word_to_id,id_to_word,MODEL_FILE)
+    train(traindata,word_to_id,id_to_word,MODEL_FILE)
     print("predict")
     the_model = EncoderDecoder(len(word_to_id),embed_size,hidden_size,batch_size,lstm_layers,dropout)
     the_model.load_state_dict(torch.load(MODEL_FILE))
@@ -258,10 +258,8 @@ def main():
             sentence = input_
             word_ids = [word_to_id.get(token, UNKNOWN_TAG[1]) for token in splitmecab(sentence)]
             idnolist=the_model.predict(word_ids)
-            returnlist = []
-            for id in idnolist:
-                returnlist.append(id_to_word[id])
-            print(returnlist)
+            answer = [id_to_word.get(bocabnum, UNKNOWN_TAG[0]) for bocabnum in idnolist]
+            print(answer)
 if  __name__ == '__main__':
     print(torch.cuda.is_available())
     main()
