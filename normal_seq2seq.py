@@ -24,7 +24,8 @@ logger.setLevel(INFO)
 logger.addHandler(handler)
 #madaattentiontuketenai
 #shape_commentator.comment(In[len(In)-2],globals(),locals())
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 class EncoderDecoder(nn.Module):
     def __init__(self, vocab_size, embed_size,hidden_size,batch_size,lstm_layers,dropout):
         super(EncoderDecoder, self).__init__()
@@ -103,17 +104,13 @@ class EncoderDecoder(nn.Module):
         return batchloss
     def predict(self,inputsentence):
         inputsentences = torch.tensor(inputsentence,dtype=torch.long,device=device)
+        print(inputsentences)
         encoder_output,encoder_hidden_taple =self.encode(inputsentences,1,False)
         decoderoutput =self.predictdecode(encoder_hidden_taple)
         return decoderoutput
     def encode_init_hidden(self,size):
         return (torch.randn(self.lstm_layers,size,self.hidden_size,device=device),torch.randn(self.lstm_layers,size,self.hidden_size,device=device))
     def decode_init_hidden(self,size,encode_hiddens):
-        #hiddens = (torch.randn(1,size,self.hidden_size))
-        #for i,encode_hidden in enumerate(encode_hiddens):
-            #hiddens[0][i] = encode_hidden
-        #print(encode_hiddens)
-        #print(hiddens)
         return encode_hiddens
 def insertEOS(sentences,numbers):
     for (sentence,number) in zip(sentences,numbers):
@@ -225,6 +222,9 @@ def train(train_data, word_to_id, id_to_word, model_path):
         logger.info("=============== total_loss: %s ===============" % total_loss)
         all_EPOCH_LOSS.append(total_loss)
     [logger.info("================ batchnumber: {}---loss: {}=======================".format(batchnumber,loss)) for batchnumber,loss in enumerate(all_EPOCH_LOSS)]
+    torch.save(encoderdecoder.state_dict(), model_path)
+def word_to_id(sentence,word_to_id):
+    word_ids = [word_to_id.get(token, UNKNOWN_TAG[1]) for token in sentence]
 """
 config
 """
@@ -240,6 +240,7 @@ dropout = float(config["encdec"]["dropout"])
 lstm_layers = int(config["encdec"]["lstm_layers"])
 max_vocab_size = int(config["encdec"]["max_vocab_size"])
 neologd_dic_path = config["neologd_dic_path"]
+save_model_path = config["save_model_path"]
 UNKNOWN_TAG = ("<UNK>", 0)
 EOS_TAG = ("<EOS>", 1)
 SOS_TAG = ("<SOS>",2)
@@ -247,20 +248,20 @@ PAD_TAG = ("<PAD>",3)
 def main():
     #tokenize()
     traindata,word_to_id,id_to_word =  get_train_data(TRAIN_TOKEN_FILE,max_vocab_size)
-    train(traindata,word_to_id,id_to_word,MODEL_FILE)
-    #outoutpredict("./testmodel",word_to_id,id_to_word,embed_size,hidden_size,BATCH_SIZE)
+    #train(traindata,word_to_id,id_to_word,MODEL_FILE)
     print("predict")
-    """with torch.no_grad():
+    the_model = EncoderDecoder(len(word_to_id),embed_size,hidden_size,batch_size,lstm_layers,dropout)
+    the_model.load_state_dict(torch.load(MODEL_FILE))
+    with torch.no_grad():
         while True:
             input_ = input("INPUT>>>")
             sentence = input_
-            idlist = predict_index_to_sentence(sentence,word_to_id)
-            idnolist=encoderdecoder.predict(idlist)
+            word_ids = [word_to_id.get(token, UNKNOWN_TAG[1]) for token in splitmecab(sentence)]
+            idnolist=the_model.predict(word_ids)
             returnlist = []
             for id in idnolist:
                 returnlist.append(id_to_word[id])
             print(returnlist)
-    torch.save(encoderdecoder.state_dict(), "./testmodel")"""
 if  __name__ == '__main__':
     print(torch.cuda.is_available())
     main()

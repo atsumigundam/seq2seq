@@ -3,7 +3,6 @@ class Token:
     def __init__(self, node):
         self.surface = node.surface
         self.__set_pos(node.feature)
-
     def __set_pos(self, feature):
         pos_list = feature.split(",")
         self.base = pos_list[6]
@@ -46,7 +45,7 @@ class Tokenizer:
 
 if __name__ == '__main__':
     neologd_dic_path = "/data/home/katsumi/mecab/dic/mecab-ipadic-neologd"
-    test = ""
+    test = "ご飯を食べる"
     tokenizer = Tokenizer("-Ochasen -d " + neologd_dic_path)
     token_list = tokenizer.tokenize(test)
     for token in token_list:
