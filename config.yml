@@ -6,7 +6,7 @@ encdec:
   embed: 256
   hidden: 512
   model: ./resources/testmodel
-  max_vocab_size: 5000
+  max_vocab_size: 30000
 train_file:
   q: ./resources/input4.txt
   a: ./resources/output4.txt

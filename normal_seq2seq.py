@@ -24,8 +24,8 @@ logger.setLevel(INFO)
 logger.addHandler(handler)
 #madaattentiontuketenai
 #shape_commentator.comment(In[len(In)-2],globals(),locals())
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cpu")
 class EncoderDecoder(nn.Module):
     def __init__(self, vocab_size, embed_size,hidden_size,batch_size,lstm_layers,dropout):
         super(EncoderDecoder, self).__init__()
@@ -39,11 +39,11 @@ class EncoderDecoder(nn.Module):
         "encoder part"
         self.encoderhidden = 0
         self.encoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=3)
-        self.encoderlstm = nn.LSTM(embed_size,self.hidden_size,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
+        self.encoderlstm = nn.LSTM(embed_size,self.hidden_size//2,num_layers=self.lstm_layers,dropout=dropout,bidirectional=True,batch_first=True)
         "decoder part"
         self.decoderhidden = 0
         self.decoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=3)
-        self.decoderlstm = nn.LSTM(embed_size,self.hidden_size,num_layers=self.lstm_layers,dropout=dropout,batch_first=True)
+        self.decoderlstm = nn.LSTM(embed_size,self.hidden_size//2,num_layers=self.lstm_layers,dropout=dropout,bidirectional=True,batch_first=True)
         self.decoderout = nn.Linear(self.hidden_size,self.vocab_size)
         "attention part"
         #attentionnobaainihadecoderhatokengotonisuru
@@ -52,13 +52,13 @@ class EncoderDecoder(nn.Module):
             self.encoderhidden = self.encode_init_hidden(sentences.size(0))
             embedded = self.encoderembedding(sentences)
             packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths,batch_first = True)
-            output,self.encoderhidden =self.encoderlstm(packed)
+            output,self.encoderhidden =self.encoderlstm(packed,self.encoderhidden)
             output, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(output,batch_first =True)
         elif train == False:
+            sentences = sentences.view(-1,len(sentences))
             self.encoderhidden = self.encode_init_hidden(sentences.size(0))
             embedded = self.encoderembedding(sentences)
-            self.encoderhidden = self.encode_init_hidden(1)
-            output,self.encoderhidden =self.encoderlstm(embedded.view(1, len(sentences),-1),self.encoderhidden)
+            output,self.encoderhidden =self.encoderlstm(embedded,self.encoderhidden)
         return output,self.encoderhidden
     def decode(self,sentences,hiddens,train):
         if train == True:
@@ -73,12 +73,15 @@ class EncoderDecoder(nn.Module):
         wid = 2
         result = []
         for i in range(max_length):
-            embedded =self.decoderembedding(torch.tensor(wid,dtype=torch.long,device = device))
-            output,self.decoderhidden =self.decoderlstm(embedded.view(1, 1,-1),self.decoderhidden)
+            wid = torch.tensor(wid,dtype=torch.long,device = device).view(1,-1)
+            embedded =self.decoderembedding(wid)
+            output,self.decoderhidden =self.decoderlstm(embedded,self.decoderhidden)
             output = self.decoderout(output)
             output = F.softmax(output[0][0],dim =0)
+            print(output)
             wid = output.argmax()
-            if wid == 3:
+            print(wid)
+            if wid ==1:
                 break
             result.append(int(wid))
         return result
@@ -90,7 +93,6 @@ class EncoderDecoder(nn.Module):
         value_outputsentences = torch.tensor(value_outputsentences,dtype=torch.long,device=device)
         sos = torch.tensor(SOS_TAG[1],dtype=torch.long,device=device).view(1,-1).expand(len(outputsentences),1)
         train_outputsentences=torch.cat([sos,train_outputsentences],dim = 1)
-        #logger.info("========in={},out={}================".format(train_outputsentences.size(),value_outputsentences.size()))
         encoder_output,encoder_hidden_taple =self.encode(inputsentences,inputpaddingnumberlist,True)
         decoderoutput =self.decode(train_outputsentences,encoder_hidden_taple,True)
         critetion = nn.CrossEntropyLoss(ignore_index=3)
@@ -109,7 +111,7 @@ class EncoderDecoder(nn.Module):
         decoderoutput =self.predictdecode(encoder_hidden_taple)
         return decoderoutput
     def encode_init_hidden(self,size):
-        return (torch.randn(self.lstm_layers,size,self.hidden_size,device=device),torch.randn(self.lstm_layers,size,self.hidden_size,device=device))
+        return (torch.randn(self.lstm_layers*2,size,self.hidden_size//2,device=device),torch.randn(self.lstm_layers*2,size,self.hidden_size//2,device=device))
     def decode_init_hidden(self,size,encode_hiddens):
         return encode_hiddens
 def insertEOS(sentences,numbers):
@@ -246,11 +248,11 @@ EOS_TAG = ("<EOS>", 1)
 SOS_TAG = ("<SOS>",2)
 PAD_TAG = ("<PAD>",3)
 def main():
-    tokenize()
+    #tokenize()
     traindata,word_to_id,id_to_word =  get_train_data(TRAIN_TOKEN_FILE,max_vocab_size)
     train(traindata,word_to_id,id_to_word,MODEL_FILE)
     print("predict")
-    the_model = EncoderDecoder(len(word_to_id),embed_size,hidden_size,batch_size,lstm_layers,dropout)
+    the_model = EncoderDecoder(len(word_to_id),embed_size,hidden_size,batch_size,lstm_layers,dropout).to("cuda")
     the_model.load_state_dict(torch.load(MODEL_FILE))
     with torch.no_grad():
         while True:
