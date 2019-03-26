@@ -1,10 +1,10 @@
 encdec:
   epoch: 30
-  lstm_layers: 2
+  lstm_layers: 1
   dropout: 0.1
-  batch: 5
-  embed: 256
-  hidden: 512
+  batch: 2
+  embed: 3
+  hidden: 5
   model: ./resources/testmodel
   max_vocab_size: 30000
 train_file:

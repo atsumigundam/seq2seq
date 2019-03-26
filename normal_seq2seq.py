@@ -39,21 +39,24 @@ class EncoderDecoder(nn.Module):
         "encoder part"
         self.encoderhidden = 0
         self.encoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=3)
-        self.encoderlstm = nn.LSTM(embed_size,self.hidden_size,num_layers=self.lstm_layers,dropout=dropout,bidirectional=True,batch_first=True)
+        self.encoderlstm = nn.LSTM(embed_size,self.hidden_size,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
         "decoder part"
         self.decoderhidden = 0
         self.decoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=3)
         self.decoderlstm = nn.LSTM(embed_size,self.hidden_size*2,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
         self.decoderout = nn.Linear(self.hidden_size*2,self.vocab_size)
         "attention part"
-        #attentionnobaainihadecoderhatokengotonisuru
+        #mada nai
     def encode(self, sentences,input_lengths,train):
         if train == True:
             self.encoderhidden = self.encode_init_hidden(sentences.size(0))
             embedded = self.encoderembedding(sentences)
+            print(embedded.size())
             packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths,batch_first = True)
             output,self.encoderhidden =self.encoderlstm(packed,self.encoderhidden)
             output, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(output,batch_first =True)
+            print(self.encoderhidden)
+            print(output)
         elif train == False:
             sentences = sentences.view(-1,len(sentences))
             self.encoderhidden = self.encode_init_hidden(sentences.size(0))
@@ -111,7 +114,7 @@ class EncoderDecoder(nn.Module):
         decoderoutput =self.predictdecode(resize_encoder_hidden)
         return decoderoutput
     def encode_init_hidden(self,size):
-        return (torch.randn(self.lstm_layers*2,size,self.hidden_size,device=device),torch.randn(self.lstm_layers*2,size,self.hidden_size,device=device))
+        return (torch.randn(self.lstm_layers,size,self.hidden_size,device=device),torch.randn(self.lstm_layers,size,self.hidden_size,device=device))
     def decode_init_hidden(self,size,encode_hiddens):
         return encode_hiddens
     def change_hidden_size(self,encode_hidden):
@@ -223,6 +226,8 @@ def train(train_data, word_to_id, id_to_word, model_path):
             optimizer.step()
             total_loss += loss
             logger.info("=============== loss: %s ===============" % loss)
+            break
+        break
         total_loss = total_loss/len(batch_training_data)
         logger.info("=============== total_loss: %s ===============" % total_loss)
         all_EPOCH_LOSS.append(total_loss)
@@ -254,6 +259,7 @@ def main():
     #tokenize()
     traindata,word_to_id,id_to_word =  get_train_data(TRAIN_TOKEN_FILE,max_vocab_size)
     train(traindata,word_to_id,id_to_word,MODEL_FILE)
+    """
     print("predict")
     the_model = EncoderDecoder(len(word_to_id),embed_size,hidden_size,batch_size,lstm_layers,dropout).to("cuda")
     the_model.load_state_dict(torch.load(MODEL_FILE))
@@ -264,7 +270,7 @@ def main():
             word_ids = [word_to_id.get(token, UNKNOWN_TAG[1]) for token in splitmecab(sentence)]
             idnolist=the_model.predict(word_ids)
             answer = [id_to_word.get(bocabnum, UNKNOWN_TAG[0]) for bocabnum in idnolist]
-            print(answer)
+            print(answer)"""
 if  __name__ == '__main__':
     print(torch.cuda.is_available())
     main()
