@@ -45,8 +45,6 @@ class EncoderDecoder(nn.Module):
         self.decoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=3)
         self.decoderlstm = nn.LSTM(embed_size,self.hidden_size*2,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
         self.decoderout = nn.Linear(self.hidden_size*2,self.vocab_size)
-        "attention part"
-        #attentionnobaainihadecoderhatokengotonisuru
     def encode(self, sentences,input_lengths,train):
         if train == True:
             self.encoderhidden = self.encode_init_hidden(sentences.size(0))
