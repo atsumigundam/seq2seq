@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 encdec:
   epoch: 10
   lstm_layers: 1
@@ -15,22 +14,4 @@ train_file:
 train_token_file:
   q: ./resources/testinputtoken.txt
   a: ./resources/testoutputtoken.txt
-=======
-encdec:
-  epoch: 10
-  lstm_layers: 1
-  dropout: 0.1
-  batch: 4
-  embed: 128
-  hidden: 256
-  encoder_path: ./resources/encoder_model
-  decoder_path: ./resources/encoder_model
-  max_vocab_size: 30000
-train_file:
-  q: ./resources/inputtest.txt
-  a: ./resources/outputest.txt
-train_token_file:
-  q: ./resources/testinputtoken.txt
-  a: ./resources/testoutputtoken.txt
->>>>>>> dc71a0f0901584b10e4a6a156db91b5a387db85a
 neologd_dic_path: /data/home/katsumi/mecab/dic/mecab-ipadic-neologd
