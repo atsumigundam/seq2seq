@@ -22,10 +22,9 @@ handler = StreamHandler()
 handler.setLevel(INFO)
 logger.setLevel(INFO)
 logger.addHandler(handler)
-#madaattentiontuketenai
-#shape_commentator.comment(In[len(In)-2],globals(),locals())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = torch.device("cpu")
+
+
 class EncoderDecoder(nn.Module):
     def __init__(self, vocab_size, embed_size,hidden_size,batch_size,lstm_layers,dropout):
         super(EncoderDecoder, self).__init__()
@@ -45,6 +44,7 @@ class EncoderDecoder(nn.Module):
         self.decoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=3)
         self.decoderlstm = nn.LSTM(embed_size,self.hidden_size*2,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
         self.decoderout = nn.Linear(self.hidden_size*2,self.vocab_size)
+
     def encode(self, sentences,input_lengths,train):
         if train == True:
             self.encoderhidden = self.encode_init_hidden(sentences.size(0))
@@ -58,6 +58,7 @@ class EncoderDecoder(nn.Module):
             embedded = self.encoderembedding(sentences)
             output,self.encoderhidden =self.encoderlstm(embedded,self.encoderhidden)
         return output,self.encoderhidden
+
     def decode(self,sentences,hiddens,train):
         if train == True:
             self.decoderhidden = self.decode_init_hidden(len(sentences),hiddens)
@@ -65,10 +66,11 @@ class EncoderDecoder(nn.Module):
             output,self.decoderhidden =self.decoderlstm(embedded,self.decoderhidden)
             output = self.decoderout(output)
         return output
+
     def predictdecode(self,hiddens):
         max_length = self.decode_max_size
         self.decoderhidden = self.decode_init_hidden(1,hiddens)
-        wid = 2
+        wid = SOS_TAG[1]
         result = []
         for i in range(max_length):
             wid = torch.tensor(wid,dtype=torch.long,device = device).view(1,-1)
@@ -79,10 +81,11 @@ class EncoderDecoder(nn.Module):
             print(output)
             wid = output.argmax()
             print(wid)
-            if wid ==1:
+            if wid ==EOS_TAG[1]:
                 break
             result.append(int(wid))
         return result
+
     def forward(self,inputsentences,inputpaddingnumberlist,outputsentences,outputpaddingnumberlist):
         inputsentences = torch.tensor(inputsentences,dtype=torch.long,device=device)
         train_outputsentences = torch.tensor(outputsentences,dtype=torch.long,device=device)

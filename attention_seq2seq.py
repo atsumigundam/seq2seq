@@ -21,6 +21,8 @@ handler.setLevel(INFO)
 logger.setLevel(INFO)
 logger.addHandler(handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 class Encoder(nn.Module):
     def __init__(self, vocab_size,embed_size,hidden_size,batch_size,lstm_layers,dropout):
         super(Encoder, self).__init__()
@@ -34,8 +36,10 @@ class Encoder(nn.Module):
         self.hidden = 0
         self.encoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=PAD_TAG[1])
         self.encoderlstm = nn.LSTM(embed_size,self.hidden_size,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
+    
     def encode_init_hidden(self,size):
         return (torch.randn(self.lstm_layers,size,self.hidden_size,device=device),torch.randn(self.lstm_layers,size,self.hidden_size,device=device))
+    
     def forward(self,sentences,mask):
         self.hidden = self.encode_init_hidden(sentences.size(0))
         embedded = self.encoderembedding(sentences)
@@ -43,6 +47,8 @@ class Encoder(nn.Module):
         output,self.hidden =self.encoderlstm(packed,self.hidden)
         output,legnth = torch.nn.utils.rnn.pad_packed_sequence(output,batch_first =True)
         return output
+
+
 class Decoder(nn.Module):
     def __init__(self, vocab_size,embed_size,hidden_size,batch_size,lstm_layers,dropout):
         super(Decoder, self).__init__()
@@ -53,18 +59,49 @@ class Decoder(nn.Module):
         self.lstm_layers = lstm_layers
         self.dropout = dropout
         "attentionpart"
-        self.attn = attn()
+        self.attn = attn(self.hidden_size)
         "decoder part"
         self.decoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=PAD_TAG[1])
-        self.deoderlstm = nn.LSTM(embed_size,self.hidden_size,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
+        self.deoderlstm = nn.LSTM(embed_size+hidden_size,self.hidden_size,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
         self.out = nn.Linear(hidden_size, vocab_size)
         self.softmax = nn.LogSoftmax(1)
-    def forward(self,words,enoder_out,t,mask):
+    
+    def forward(self,words,encoder_output,t,mask):
         embedded = self.decoderembedding(words)
+        embedded = torch.cat((embedded,self.attn.hidden),2)
         lstm_output,self.hidden = self.deoderlstm(embedded,self.hidden)
-        output = self.out(lstm_output).squeeze(1)
+        lstm_attn_output= self.attn(lstm_output,encoder_output,t,mask)
+        output = self.out(lstm_attn_output).squeeze(1)
         output = self.softmax(output)
         return output
+
+
+class attn(nn.Module):
+    def __init__(self,hidden_size):
+        super().__init__()
+        self.hidden = None
+        self.Va = None 
+        self.hidden_size = hidden_size
+        self.Wa = nn.Linear(hidden_size, hidden_size)
+        self.softmax = nn.Softmax(2)
+        self.Wc = nn.Linear(hidden_size * 2, hidden_size)
+    
+    def align(self, lstm_output, encoder_output, mask, k):
+        x = lstm_output.bmm(self.Wa(encoder_output).transpose(1, 2)) #(batch,1,hidden)*(batch,hidden,len(batch)) = (batch,1,len(batch))
+        x = x.masked_fill(mask.unsqueeze(1), -10000) 
+        x = self.softmax(x)
+        return x
+    
+    def forward(self, lstm_output, encoder_output, t, mask):
+        mask = mask[0]
+        k = None
+        self.Va = self.align(lstm_output, encoder_output, mask, k)
+        x = self.Va
+        c = x.bmm(encoder_output) # context vector (batch,1,len(batch)) *(batch,hidden,len(batch)) =(batch,1,hidden)
+        h = torch.cat((c, lstm_output), 2)
+        self.hidden = torch.tanh(self.Wc(h)) # attentional vector
+        return self.hidden
+
 def splitmecab(sentence):
     tokenlist=[]
     neologd_dic_path = "/data/home/katsumi/mecab/dic/mecab-ipadic-neologd" 
@@ -73,6 +110,7 @@ def splitmecab(sentence):
     for token in token_list:
         tokenlist.append(token.surface)
     return tokenlist
+
 def get_train_data(TRAIN__TOKEN_FILE, max_vocab_size):
     logger.info("========= START TO GET TOKEN ==========")
     with open(file=TRAIN_TOKEN_FILE[0], encoding="utf-8") as question_text_file, open(file=TRAIN_TOKEN_FILE[1],
@@ -105,6 +143,7 @@ def get_train_data(TRAIN__TOKEN_FILE, max_vocab_size):
         if len(input_words) > 0 and len(output_words) >0:
             train_data.append([input_words, output_words])
     return train_data, word_to_id, id_to_word
+
 def tokenize():
     logger.info("========= START TO TOKENIZE ==========")
     tokenizer = mecab_tokenizer.Tokenizer("-Ochasen -d " + neologd_dic_path)
@@ -123,6 +162,7 @@ def tokenize():
         for line1, line2 in train_tokenized:
             f1.write(line1 + "\r\n")
             f2.write(line2 + "\r\n")
+
 def makeminibatch(training_data):
     n = len(training_data)
     mini_batch_size = int(n/batch_size)
@@ -134,9 +174,14 @@ def makeminibatch(training_data):
         else:
             batch_training_data.append(training_data[i:i+batch_size])
     return batch_training_data
+
 def padding_mask(sentences,word_to_id):
     mask = sentences.data.eq(word_to_id[PAD_TAG[0]])
     return (mask, sentences.size(1) - mask.sum(1))
+
+def word_to_id(sentence,word_to_id):
+    word_ids = [word_to_id.get(token, UNKNOWN_TAG[1]) for token in sentence]
+
 def train(train_data, word_to_id, id_to_word, model_path):
     encoder = Encoder(len(word_to_id),embed_size,hidden_size,batch_size,lstm_layers,dropout).to(device)
     decoder = Decoder(len(word_to_id),embed_size,hidden_size,batch_size,lstm_layers,dropout).to(device)
@@ -166,17 +211,15 @@ def train(train_data, word_to_id, id_to_word, model_path):
             outputsentences = torch.tensor(outputsentences,dtype=torch.long,device=device)
             mask = padding_mask(inputsentences,word_to_id)
             encoder_out = encoder(inputsentences,mask)
-            decoder_input = torch.tensor([SOS_TAG[1]] * len(inputsentences)).unsqueeze(1)
+            decoder_input = torch.tensor([SOS_TAG[1]] * len(inputsentences),device = device).unsqueeze(1)
             decoder.hidden = encoder.hidden
+            decoder.attn.hidden = torch.zeros(len(batch_data),1,hidden_size,device = device)
             for t in range(outputsentences.size(1)):
                 decoder_output = decoder(decoder_input,encoder_out,t,mask)
                 loss += F.nll_loss(decoder_output, outputsentences[:, t], ignore_index = PAD_TAG[1], reduction = "sum")
-                decoder_input = outputsentences[:, t].unsqueeze(1) #teacher forcing
-                #decoder_input = decoder_output.squeeze(1).argmax(1,keepdim=True) #else
-                break
-            break
+                #decoder_input = outputsentences[:, t].unsqueeze(1) #teacher forcing
+                decoder_input = decoder_output.squeeze(1).argmax(1,keepdim=True) #else
             loss /= outputsentences.data.gt(0).sum().float()
-            sys.exit()
             loss.backward()
             encoder_optimizer.step()
             decoder_optimizer.step()
@@ -186,15 +229,14 @@ def train(train_data, word_to_id, id_to_word, model_path):
         logger.info("=============== total_loss: %s ===============" % total_loss)
         all_EPOCH_LOSS.append(total_loss)
     [logger.info("================ batchnumber: {}---loss: {}=======================".format(batchnumber,loss)) for batchnumber,loss in enumerate(all_EPOCH_LOSS)]
-    torch.save(encoderdecoder.state_dict(), model_path)
-def word_to_id(sentence,word_to_id):
-    word_ids = [word_to_id.get(token, UNKNOWN_TAG[1]) for token in sentence]
+    torch.save(encoder.state_dict(), model_path[0])
+    torch.save(decoder.state_dict(), model_path[1])
 """
 config
 """
 config = yaml.load(open("config.yml", encoding="utf-8"))
 TRAIN_FILE = (config["train_file"]["q"], config["train_file"]["a"])
-MODEL_FILE = config["encdec"]["model"]
+MODEL_FILE = (config["encdec"]["encoder_path"],config["encdec"]["decoder_path"])
 TRAIN_TOKEN_FILE = (config["train_token_file"]["q"],config["train_token_file"]["a"])
 epoch_num = int(config["encdec"]["epoch"])
 batch_size = int(config["encdec"]["batch"])
@@ -204,7 +246,6 @@ dropout = float(config["encdec"]["dropout"])
 lstm_layers = int(config["encdec"]["lstm_layers"])
 max_vocab_size = int(config["encdec"]["max_vocab_size"])
 neologd_dic_path = config["neologd_dic_path"]
-save_model_path = config["save_model_path"]
 PAD_TAG = ("<PAD>",0)
 UNKNOWN_TAG = ("<UNK>", 1)
 EOS_TAG = ("<EOS>", 3)
