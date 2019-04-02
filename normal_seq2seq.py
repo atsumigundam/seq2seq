@@ -40,23 +40,21 @@ class EncoderDecoder(nn.Module):
         self.encoderhidden = 0
         self.encoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=3)
         self.encoderlstm = nn.LSTM(embed_size,self.hidden_size,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
+        print(self.encoderembedding)
         "decoder part"
         self.decoderhidden = 0
         self.decoderembedding = nn.Embedding(vocab_size, embed_size,padding_idx=3)
         self.decoderlstm = nn.LSTM(embed_size,self.hidden_size*2,num_layers=self.lstm_layers,dropout=dropout,bidirectional=False,batch_first=True)
         self.decoderout = nn.Linear(self.hidden_size*2,self.vocab_size)
-        "attention part"
-        #mada nai
     def encode(self, sentences,input_lengths,train):
         if train == True:
+            print(sentences.size())
             self.encoderhidden = self.encode_init_hidden(sentences.size(0))
             embedded = self.encoderembedding(sentences)
             print(embedded.size())
             packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths,batch_first = True)
             output,self.encoderhidden =self.encoderlstm(packed,self.encoderhidden)
             output, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(output,batch_first =True)
-            print(self.encoderhidden)
-            print(output)
         elif train == False:
             sentences = sentences.view(-1,len(sentences))
             self.encoderhidden = self.encode_init_hidden(sentences.size(0))
